@@ -61,12 +61,21 @@ def render_memory_panel(user_id: str, condition: str):
     """사이드바에 현재 저장된 메모리 목록을 표시하고 개별 삭제를 허용한다."""
     with st.sidebar:
         st.subheader("내 기억 목록")
+        st.caption(f"uid: `{user_id}`")
 
         if st.button("새로고침", key="refresh_memories"):
             log_event(user_id, condition, "memory_viewed")
             st.rerun()
 
         memories = get_memories(user_id)
+
+        # with st.expander("🔍 디버그 (raw)", expanded=False):
+        #     from memory_engine import get_mem0_client
+        #     try:
+        #         raw = get_mem0_client().get_all(filters={"user_id": user_id})
+        #         st.write(raw)
+        #     except Exception as e:
+        #         st.error(e)
 
         if not memories:
             st.caption("아직 저장된 기억이 없어요.")

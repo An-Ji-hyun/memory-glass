@@ -42,7 +42,7 @@ def get_memories(user_id: str, query: str = None) -> list:
         if query:
             result = client.search(query, user_id=user_id)
         else:
-            result = client.get_all(user_id=user_id)
+            result = client.get_all(filters={"user_id": user_id})
 
         if isinstance(result, dict):
             return result.get("results", [])
