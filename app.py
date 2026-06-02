@@ -15,6 +15,7 @@ from memory_engine import (
     delete_memory, update_memory, add_manual_memory,
 )
 from logger import log_event, sync_to_sheets, get_log_df
+from surveys import render_pre_survey, render_post_survey
 
 st.set_page_config(page_title="MemoryGlass", page_icon="🧠", layout="wide")
 
@@ -26,7 +27,7 @@ is_admin  = params.get("admin", "") == admin_key
 
 # ── 세션 상태 초기화 ─────────────────────────────────────────────────────────
 defaults = {
-    "screen":             "chat",   # "chat" | "memory_view"
+    "screen":             "consent",  # consent|pre_survey|chat|memory_view|post_survey|complete
     "chat_history":       [],
     "message_count":      0,
     "session_started":    False,
@@ -39,7 +40,10 @@ defaults = {
     "conversation_saved": False,
     "memory_clusters":    None,
     "selected_topic":     0,
-    "event_log":          [],
+    "pre_survey_data":       None,
+    "post_survey_data":      None,
+    "show_pre_survey_intro": True,
+    "event_log":             [],
 }
 for k, v in defaults.items():
     if k not in st.session_state:
@@ -49,8 +53,8 @@ if not st.session_state.session_started:
     log_event(uid, "session_start", {"uid": uid})
     st.session_state.session_started = True
 
-# ── Phase 0: 동의서 ──────────────────────────────────────────────────────────
-if not st.session_state.consent_given:
+# ── 동의서 화면 ──────────────────────────────────────────────────────────────
+if st.session_state.screen == "consent":
     st.title("🧠 MemoryGlass 연구 참여 동의")
     st.markdown(f"""
 **{uid}님 안녕하세요. 본 연구에 참여해 주셔서 감사합니다.**
@@ -64,10 +68,55 @@ if not st.session_state.consent_given:
     """)
     if st.button("✅ 동의하고 시작하기", type="primary"):
         st.session_state.consent_given = True
-        st.session_state.show_task1_intro = True
+        st.session_state.screen = "pre_survey"
         log_event(uid, "consent_agreed")
+        st.rerun()
+    st.stop()
+
+# ── 사전 설문 화면 ────────────────────────────────────────────────────────────
+@st.dialog("사전 설문 안내")
+def pre_survey_intro_dialog():
+    st.markdown("시스템을 사용하기 전 사전 설문을 진행해주세요.")
+    if st.button("설문 시작하기", type="primary", key="pre_intro_ok"):
+        st.session_state.show_pre_survey_intro = False
+        st.rerun()
+
+if st.session_state.screen == "pre_survey":
+    if st.session_state.show_pre_survey_intro:
+        pre_survey_intro_dialog()
+    st.title("🧠 MemoryGlass")
+    result = render_pre_survey()
+    if result is not None:
+        st.session_state.pre_survey_data = result
+        st.session_state.screen = "chat"
+        st.session_state.show_task1_intro = True
+        log_event(uid, "pre_survey_submitted", result)
         log_event(uid, "task_started", {"task": "vacation"})
         st.rerun()
+    st.stop()
+
+# ── 사후 설문 화면 ────────────────────────────────────────────────────────────
+if st.session_state.screen == "post_survey":
+    st.title("🧠 MemoryGlass")
+    result = render_post_survey(st.session_state.event_log)
+    if result is not None:
+        st.session_state.post_survey_data = result
+        st.session_state.screen = "complete"
+        log_event(uid, "post_survey_submitted", result)
+        sync_to_sheets()
+        st.rerun()
+    st.stop()
+
+# ── 완료 화면 ─────────────────────────────────────────────────────────────────
+if st.session_state.screen == "complete":
+    st.title("🧠 MemoryGlass")
+    st.success("모든 과정이 완료되었습니다. 참여해 주셔서 감사합니다! 🎉")
+    st.markdown(f"""
+**{uid}님, 연구에 참여해 주셔서 진심으로 감사드립니다.**
+
+설문과 대화 내용은 안전하게 저장되었습니다.
+연구자의 안내에 따라 다음 단계를 진행해주세요.
+    """)
     st.stop()
 
 # ── 다이얼로그 ───────────────────────────────────────────────────────────────
@@ -176,6 +225,20 @@ def memory_intro_dialog():
         st.rerun()
 
 
+@st.dialog("사후 설문으로 이동")
+def confirm_post_survey():
+    st.warning("정말로 메모리 수정/추가/삭제를 완료하고 사후 설문으로 넘어가시겠습니까?\n\n**이 작업은 되돌릴 수 없습니다.**")
+    c1, c2 = st.columns(2)
+    with c1:
+        if st.button("사후 설문 하러가기", type="primary", key="post_survey_yes"):
+            log_event(uid, "memory_review_completed")
+            st.session_state.screen = "post_survey"
+            st.rerun()
+    with c2:
+        if st.button("취소", key="post_survey_no"):
+            st.rerun()
+
+
 @st.dialog("새 토픽 추가")
 def add_topic_dialog():
     topic_name = st.text_input("토픽 이름", placeholder="예: 음식 취향")
@@ -207,6 +270,9 @@ if st.session_state.screen == "memory_view":
         st.divider()
         st.success("✅ 대화 완료")
         st.caption("저장된 기억을 확인하고\n자유롭게 수정해보세요.")
+        st.divider()
+        if st.button("📋 사후 설문으로 이동", type="primary", use_container_width=True):
+            confirm_post_survey()
 
     st.title("🧠 저장된 기억 분석")
 
