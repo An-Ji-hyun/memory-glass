@@ -33,6 +33,7 @@ defaults = {
     "consent_given":      False,
     "show_task1_intro":   False,
     "show_task2_intro":   False,
+    "show_memory_intro":  False,
     "current_task":       "vacation",
     "task2_start_index":  0,
     "conversation_saved": False,
@@ -146,6 +147,7 @@ def confirm_complete():
             st.session_state.conversation_saved = True
             st.session_state.memory_clusters    = clusters
             st.session_state.selected_topic     = 0
+            st.session_state.show_memory_intro  = True
             log_event(uid, "memory_panel_opened", {"memory_count": len(all_mems)})
             st.session_state.screen = "memory_view"
             st.rerun()
@@ -154,11 +156,50 @@ def confirm_complete():
             st.rerun()
 
 
+# ── 메모리 화면 전용 다이얼로그 ─────────────────────────────────────────────
+@st.dialog("저장된 기억 확인 안내")
+def memory_intro_dialog():
+    st.markdown("""
+챗봇이 대화에서 기억한 내용을 확인할 수 있어요.
+
+**이 기억들은 다음에 이 챗봇을 다시 사용할 때 활용됩니다.**
+
+아래 작업을 자유롭게 해보세요:
+
+- ✏️ **수정** — 잘못 저장된 정보가 있다면 직접 고칠 수 있어요
+- 🗑️ **삭제** — 챗봇이 기억하지 않았으면 하는 내용은 삭제할 수 있어요
+- ➕ **추가** — 챗봇이 기억할 거라 생각했는데 빠진 내용이 있다면 직접 추가할 수 있어요
+- 🏷️ **토픽 변경** — 기억을 다른 토픽으로 옮기거나 새 토픽을 만들 수 있어요
+    """)
+    if st.button("✅ 확인했어요", type="primary", key="memory_intro_ok"):
+        st.session_state.show_memory_intro = False
+        st.rerun()
+
+
+@st.dialog("새 토픽 추가")
+def add_topic_dialog():
+    topic_name = st.text_input("토픽 이름", placeholder="예: 음식 취향")
+    if st.button("추가하기", type="primary", key="add_topic_confirm"):
+        if topic_name.strip():
+            st.session_state.memory_clusters.append({
+                "label": topic_name.strip(),
+                "items": [],
+                "count": 0,
+            })
+            st.session_state.selected_topic = len(st.session_state.memory_clusters) - 1
+            log_event(uid, "topic_added", {"label": topic_name.strip()})
+            st.rerun()
+
+
 # ══════════════════════════════════════════════════════════════════════════════
 # 메모리 분석 화면
 # ══════════════════════════════════════════════════════════════════════════════
 if st.session_state.screen == "memory_view":
     clusters = st.session_state.memory_clusters or []
+
+    # 안내 팝업
+    if st.session_state.show_memory_intro:
+        memory_intro_dialog()
 
     # 사이드바
     with st.sidebar:
@@ -173,41 +214,44 @@ if st.session_state.screen == "memory_view":
         st.info("저장된 기억이 없어요.")
         st.stop()
 
-    total = sum(c["count"] for c in clusters)
+    total = sum(len(c["items"]) for c in clusters)
     st.caption(f"총 {total}개의 기억이 {len(clusters)}개 토픽으로 분류되었어요.")
     st.divider()
 
     chart_col, detail_col = st.columns([1, 1.4])
+    colors = ["#636EFA","#EF553B","#00CC96","#AB63FA","#FFA15A","#19D3F3","#FF6692"]
 
     # ── 파이차트 ──────────────────────────────────────────────────────────────
     with chart_col:
-        labels  = [c["label"] for c in clusters]
-        values  = [c["count"] for c in clusters]
-        colors  = ["#636EFA","#EF553B","#00CC96","#AB63FA","#FFA15A"]
+        labels = [c["label"] for c in clusters]
+        values = [max(len(c["items"]), 0) for c in clusters]
+        visible = [(l, v) for l, v in zip(labels, values) if v > 0]
 
-        fig = go.Figure(go.Pie(
-            labels=labels,
-            values=values,
-            hole=0.45,
-            marker_colors=colors[:len(labels)],
-            textinfo="label+percent",
-            hovertemplate="%{label}<br>%{value}개 (%{percent})<extra></extra>",
-        ))
-        fig.update_layout(
-            margin=dict(t=20, b=20, l=20, r=20),
-            showlegend=False,
-            height=300,
-        )
-        st.plotly_chart(fig, use_container_width=True)
+        if visible:
+            vl, vv = zip(*visible)
+            fig = go.Figure(go.Pie(
+                labels=list(vl), values=list(vv), hole=0.45,
+                marker_colors=colors[:len(vl)],
+                textinfo="label+percent",
+                hovertemplate="%{label}<br>%{value}개 (%{percent})<extra></extra>",
+            ))
+            fig.update_layout(margin=dict(t=20, b=20, l=20, r=20),
+                              showlegend=False, height=300)
+            st.plotly_chart(fig, use_container_width=True)
 
         # 토픽 선택 버튼
         st.markdown("**토픽 선택**")
         for i, cluster in enumerate(clusters):
-            label = f"{cluster['label']}  ({cluster['count']}개)"
-            btn_type = "primary" if st.session_state.selected_topic == i else "secondary"
-            if st.button(label, key=f"topic_btn_{i}", type=btn_type, use_container_width=True):
+            cnt   = len(cluster["items"])
+            label = f"{cluster['label']}  ({cnt}개)"
+            btype = "primary" if st.session_state.selected_topic == i else "secondary"
+            if st.button(label, key=f"topic_btn_{i}", type=btype, use_container_width=True):
                 st.session_state.selected_topic = i
                 st.rerun()
+
+        st.divider()
+        if st.button("＋ 토픽 추가하기", use_container_width=True):
+            add_topic_dialog()
 
     # ── 선택된 토픽 세부 메모리 ───────────────────────────────────────────────
     with detail_col:
@@ -215,52 +259,73 @@ if st.session_state.screen == "memory_view":
         if sel < len(clusters):
             cluster = clusters[sel]
             st.markdown(f"### 💬 {cluster['label']}")
-            st.caption(f"{cluster['count']}개의 기억이 저장되어 있어요.")
+            st.caption(f"{len(cluster['items'])}개의 기억이 저장되어 있어요.")
             st.divider()
 
-            for item in cluster["items"]:
+            other_topics = [(j, c["label"]) for j, c in enumerate(clusters) if j != sel]
+
+            for item_idx, item in enumerate(cluster["items"]):
                 with st.container():
                     st.markdown(f"**{item['text']}**")
+
                     if item.get("source"):
-                        with st.expander("원본 발화 확인하기"):
+                        with st.expander("🔍 원본 발화 확인하기"):
                             st.markdown(f"> {item['source']}")
 
-                    c1, c2 = st.columns([3, 1])
+                    c1, c2, c3 = st.columns([2, 2, 1])
+
                     with c1:
                         with st.expander("✏️ 수정하기"):
                             new_text = st.text_area("", value=item["text"],
-                                                     key=f"edit_{item['id']}", height=70)
+                                                     key=f"edit_{item['id']}_{item_idx}", height=70)
                             s1, s2 = st.columns(2)
                             with s1:
-                                if st.button("저장", key=f"save_{item['id']}"):
+                                if st.button("저장", key=f"save_{item['id']}_{item_idx}"):
                                     if update_memory(item["id"], new_text):
+                                        clusters[sel]["items"][item_idx]["text"] = new_text
                                         log_event(uid, "memory_edited",
                                                   {"old": item["text"], "new": new_text})
                                         sync_to_sheets()
-                                        st.success("수정됨")
                                         st.rerun()
                             with s2:
-                                if st.button("취소", key=f"cancel_{item['id']}"):
-                                    log_event(uid, "edit_cancelled", {"memory": item["text"]})
+                                if st.button("취소", key=f"cancel_{item['id']}_{item_idx}"):
                                     st.rerun()
+
                     with c2:
-                        if st.button("🗑️ 삭제", key=f"del_{item['id']}"):
-                            if delete_memory(item["id"]):
+                        if other_topics:
+                            with st.expander("🏷️ 토픽 변경"):
+                                for j, tlabel in other_topics:
+                                    if st.button(tlabel, key=f"move_{item['id']}_{item_idx}_{j}"):
+                                        moved = clusters[sel]["items"].pop(item_idx)
+                                        clusters[j]["items"].append(moved)
+                                        log_event(uid, "memory_moved",
+                                                  {"memory": item["text"], "to": tlabel})
+                                        st.rerun()
+
+                    with c3:
+                        if st.button("🗑️", key=f"del_{item['id']}_{item_idx}"):
+                            if item["id"] and delete_memory(item["id"]):
                                 log_event(uid, "memory_deleted", {"memory": item["text"]})
                                 sync_to_sheets()
-                                st.success("삭제됨")
-                                st.rerun()
+                            clusters[sel]["items"].pop(item_idx)
+                            st.rerun()
+
                     st.divider()
 
-            # 직접 추가
-            st.markdown("#### ➕ 기억 직접 추가")
-            st.caption("챗봇이 기억했으면 하는 내용을 직접 추가할 수 있어요.")
-            add_text = st.text_area("추가할 내용", key="add_input", height=70,
+            # 이 토픽에 기억 추가
+            st.markdown("#### ➕ 이 토픽에 기억 추가")
+            st.caption("챗봇이 기억하지 못한 내용을 직접 추가할 수 있어요.")
+            add_text = st.text_area("추가할 내용", key=f"add_input_{sel}", height=70,
                                      placeholder="예: 나는 피자보다 파스타를 더 좋아해")
-            if st.button("➕ 추가"):
+            if st.button("➕ 추가", key=f"add_btn_{sel}"):
                 if add_text.strip():
-                    if add_manual_memory(uid, add_text):
-                        log_event(uid, "memory_added", {"memory": add_text})
+                    if add_manual_memory(uid, add_text.strip()):
+                        clusters[sel]["items"].append({
+                            "id":     "",
+                            "text":   add_text.strip(),
+                            "source": "",
+                        })
+                        log_event(uid, "memory_added", {"memory": add_text.strip()})
                         sync_to_sheets()
                         st.success("추가됨")
                         st.rerun()
