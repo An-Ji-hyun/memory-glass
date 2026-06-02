@@ -5,7 +5,7 @@ app.py — MemoryGlass 메인 앱
 
 URL 파라미터:
     ?uid=P001                        → 참가자 접속
-    ?uid=P001&admin=researcher2025   → 연구자 접속 (관리자 컨트롤 노출)
+    ?uid=P001&admin=researcher2025   → 연구자 데이터 패널 접속
 """
 
 import streamlit as st
@@ -18,8 +18,8 @@ from logger import log_event, sync_to_sheets, get_log_df
 st.set_page_config(page_title="MemoryGlass", page_icon="🧠", layout="wide")
 
 # ── URL 파라미터 파싱 ────────────────────────────────────────────────────────
-params   = st.query_params
-uid      = params.get("uid", "guest")
+params    = st.query_params
+uid       = params.get("uid", "guest")
 admin_key = st.secrets.get("ADMIN_KEY", "researcher2025")
 is_admin  = params.get("admin", "") == admin_key
 
@@ -54,10 +54,9 @@ if not st.session_state.consent_given:
 **연구 목적:** AI 챗봇 인터페이스 설계 연구
 
 **안내 사항:**
-- 대화 내용은 연구 목적으로만 사용됩니다
-- 개인 식별 정보는 수집하지 않습니다
-- 언제든지 참여를 중단할 수 있습니다
-- 실험 종료 후 자세한 설명을 드립니다
+- 대화 내용은 연구 목적으로만 사용됩니다.
+- 개인 식별 정보는 수집하지 않습니다.
+- 언제든지 참여를 중단할 수 있으며, 정보 폐기를 요청할 수 있습니다.
     """)
 
     if st.button("✅ 동의하고 시작하기", type="primary"):
@@ -67,6 +66,41 @@ if not st.session_state.consent_given:
         st.rerun()
 
     st.stop()
+
+# ── 다이얼로그 정의 ──────────────────────────────────────────────────────────
+@st.dialog("다음 주제로 넘어가기")
+def confirm_next_topic():
+    st.write("연구자의 지시 하에 다음 주제 버튼을 누를 수 있습니다. 넘어가시겠습니까?")
+    col1, col2 = st.columns(2)
+    with col1:
+        if st.button("예, 넘어갈게요", type="primary", key="confirm_next_yes"):
+            with st.spinner("대화 내용을 저장하는 중..."):
+                saved = save_conversation(uid, st.session_state.chat_history)
+            log_event(uid, "task_started", {"task": "concern", "task1_memories": len(saved)})
+            st.session_state.current_task = "concern"
+            st.rerun()
+    with col2:
+        if st.button("아니오", key="confirm_next_no"):
+            st.rerun()
+
+
+@st.dialog("대화 완료")
+def confirm_complete():
+    st.write("연구자의 지시 하에 완료 버튼을 누를 수 있습니다. 완료하시겠습니까?")
+    col1, col2 = st.columns(2)
+    with col1:
+        if st.button("예, 완료할게요", type="primary", key="confirm_done_yes"):
+            with st.spinner("대화 내용을 저장하는 중..."):
+                saved = save_conversation(uid, st.session_state.chat_history)
+            st.session_state.conversation_saved = True
+            st.session_state.memory_panel_open = True
+            st.session_state.memory_open_time = datetime.now()
+            log_event(uid, "memory_panel_opened", {"memory_count": len(saved)})
+            st.rerun()
+    with col2:
+        if st.button("아니오", key="confirm_done_no"):
+            st.rerun()
+
 
 # ── 레이아웃: 패널 열림 여부에 따라 컬럼 분할 ────────────────────────────────
 if st.session_state.memory_panel_open:
@@ -81,36 +115,7 @@ else:
 with chat_col:
     st.title("🧠 MemoryGlass")
 
-    # 연구자 컨트롤 패널
-    if is_admin:
-        with st.expander("🔬 연구자 컨트롤", expanded=True):
-            col1, col2, col3 = st.columns(3)
-
-            with col1:
-                if st.button("📌 주제 2로 전환"):
-                    st.session_state.current_task = "concern"
-                    log_event(uid, "task_started", {"task": "concern"})
-                    st.rerun()
-
-            with col2:
-                if not st.session_state.memory_panel_open:
-                    if st.button("🧠 메모리 패널 열기"):
-                        if (st.session_state.chat_history
-                                and not st.session_state.conversation_saved):
-                            with st.spinner("대화를 분석하는 중..."):
-                                saved = save_conversation(uid, st.session_state.chat_history)
-                            st.session_state.conversation_saved = True
-                            log_event(uid, "memory_panel_opened",
-                                      {"memory_count": len(saved)})
-                        st.session_state.memory_panel_open = True
-                        st.session_state.memory_open_time = datetime.now()
-                        st.rerun()
-
-            with col3:
-                st.caption(f"참가자: {uid}")
-                st.caption(f"턴 수: {st.session_state.message_count}")
-
-    # 태스크 안내
+    # 태스크 안내 + 전환/완료 버튼
     if not st.session_state.memory_panel_open:
         if st.session_state.current_task == "vacation":
             st.info("""
@@ -118,11 +123,15 @@ with chat_col:
 이번 여름 휴가 계획에 대해 챗봇과 자유롭게 이야기해보세요.
 어디를 가고 싶은지, 누구와 갈지, 어떻게 보내고 싶은지 편하게 말씀해주세요.
             """)
+            if st.button("📌 다음 주제로 넘어가기"):
+                confirm_next_topic()
         else:
             st.info("""
 💬 **주제 2: 요즘 관심사 / 고민**
 요즘 관심 있는 것이나 신경 쓰이는 일을 챗봇과 편하게 이야기해보세요.
             """)
+            if st.button("✅ 대화 완료"):
+                confirm_complete()
 
     st.divider()
 
@@ -167,7 +176,7 @@ with chat_col:
             st.rerun()
 
 # ══════════════════════════════════════════════════════════════════════════════
-# 메모리 패널 (연구자가 열었을 때만)
+# 메모리 패널 (완료 후)
 # ══════════════════════════════════════════════════════════════════════════════
 if st.session_state.memory_panel_open and mem_col:
     with mem_col:
@@ -249,7 +258,7 @@ if st.session_state.memory_panel_open and mem_col:
                     st.rerun()
 
 # ══════════════════════════════════════════════════════════════════════════════
-# 연구자 데이터 패널 (화면 하단, 관리자만)
+# 연구자 데이터 패널 (관리자만, 별도 URL로 접속)
 # ══════════════════════════════════════════════════════════════════════════════
 if is_admin:
     st.divider()
