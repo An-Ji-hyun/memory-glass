@@ -35,21 +35,27 @@ _SHEET_HEADERS = ["timestamp", "user_id", "event_type", "detail"]
 
 
 @st.cache_resource
-def _get_sheet():
+def _get_spreadsheet():
     creds = Credentials.from_service_account_info(
         dict(st.secrets["gcp_service_account"]),
         scopes=_SCOPES
     )
     gc = gspread.authorize(creds)
-    sh = gc.open_by_key(st.secrets["SHEETS_ID"])
+    return gc.open_by_key(st.secrets["SHEETS_ID"])
 
+
+def _get_or_create_ws(title: str, headers: list):
+    sh = _get_spreadsheet()
     try:
-        ws = sh.worksheet("log")
+        return sh.worksheet(title)
     except gspread.WorksheetNotFound:
-        ws = sh.add_worksheet(title="log", rows=5000, cols=len(_SHEET_HEADERS))
-        ws.append_row(_SHEET_HEADERS)
+        ws = sh.add_worksheet(title=title, rows=2000, cols=len(headers))
+        ws.append_row(headers)
+        return ws
 
-    return ws
+
+def _get_sheet():
+    return _get_or_create_ws("log", _SHEET_HEADERS)
 
 
 def sync_to_sheets():
@@ -77,6 +83,49 @@ def log_event(user_id: str, event_type: str, detail: dict = None):
     st.session_state["event_log"].append(entry)
 
     sync_to_sheets()
+
+
+_PRE_SURVEY_HEADERS = [
+    "timestamp", "user_id",
+    "chatbot_frequency", "chatbots_used", "usage_purpose",
+    "expected_memory", "aware_of_memory",
+]
+
+_POST_SURVEY_HEADERS = [
+    "timestamp", "user_id",
+    "memory_awareness", "unexpected_memory", "unexpected_desc",
+    "wrong_memory", "wrong_desc", "want_easy_memory", "want_reason",
+    "edit_delete_intent", "add_intent", "would_use_crud",
+    "useful_feature", "inconvenient", "preferred_display",
+    "preferred_timing", "timing_reason", "wanted_feature",
+]
+
+
+def save_pre_survey(user_id: str, data: dict):
+    """사전 설문 결과를 pre_survey 탭에 저장."""
+    try:
+        ws = _get_or_create_ws("pre_survey", _PRE_SURVEY_HEADERS)
+        row = [datetime.now().isoformat(), user_id] + [
+            json.dumps(data.get(h, ""), ensure_ascii=False)
+            if isinstance(data.get(h), list)
+            else str(data.get(h, ""))
+            for h in _PRE_SURVEY_HEADERS[2:]
+        ]
+        ws.append_row(row)
+    except Exception:
+        pass
+
+
+def save_post_survey(user_id: str, data: dict):
+    """사후 설문 결과를 post_survey 탭에 저장."""
+    try:
+        ws = _get_or_create_ws("post_survey", _POST_SURVEY_HEADERS)
+        row = [datetime.now().isoformat(), user_id] + [
+            str(data.get(h, "")) for h in _POST_SURVEY_HEADERS[2:]
+        ]
+        ws.append_row(row)
+    except Exception:
+        pass
 
 
 def get_log_df() -> pd.DataFrame:

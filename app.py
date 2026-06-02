@@ -14,7 +14,7 @@ from memory_engine import (
     cluster_memories_with_sources,
     delete_memory, update_memory, add_manual_memory,
 )
-from logger import log_event, sync_to_sheets, get_log_df
+from logger import log_event, sync_to_sheets, get_log_df, save_pre_survey, save_post_survey
 from surveys import render_pre_survey, render_post_survey
 
 st.set_page_config(page_title="MemoryGlass", page_icon="🧠", layout="wide")
@@ -91,6 +91,7 @@ if st.session_state.screen == "pre_survey":
         st.session_state.screen = "chat"
         st.session_state.show_task1_intro = True
         log_event(uid, "pre_survey_submitted", result)
+        save_pre_survey(uid, result)
         log_event(uid, "task_started", {"task": "vacation"})
         st.rerun()
     st.stop()
@@ -103,6 +104,7 @@ if st.session_state.screen == "post_survey":
         st.session_state.post_survey_data = result
         st.session_state.screen = "complete"
         log_event(uid, "post_survey_submitted", result)
+        save_post_survey(uid, result)
         sync_to_sheets()
         st.rerun()
     st.stop()
