@@ -392,7 +392,9 @@ if user_input:
 
     st.session_state.message_count += 1
     log_event(uid, "message_sent", {
-        "turn": st.session_state.message_count, "length": len(user_input)
+        "turn": st.session_state.message_count,
+        "length": len(user_input),
+        "content": user_input
     })
     st.session_state.chat_history.append({"role": "user", "content": user_input})
 
