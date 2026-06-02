@@ -85,31 +85,45 @@ def log_event(user_id: str, event_type: str, detail: dict = None):
     sync_to_sheets()
 
 
-_PRE_SURVEY_HEADERS = [
-    "timestamp", "user_id",
-    "chatbot_frequency", "chatbots_used", "usage_purpose",
-    "expected_memory", "aware_of_memory",
+# (질문 텍스트, data dict 키) 쌍으로 정의 — 시트 헤더가 질문 그대로 표시됨
+_PRE_SURVEY_FIELDS = [
+    ("Q1. 챗봇을 주 몇 회 사용하시나요?",                              "chatbot_frequency"),
+    ("Q2. 어떤 챗봇을 사용하시나요?",                                  "chatbots_used"),
+    ("Q3. 챗봇 사용 용도는?",                                          "usage_purpose"),
+    ("Q4. AI 챗봇이 기억할 것 같은 정보는?",                           "expected_memory"),
+    ("Q5. 메모리 기능 인지 여부",                                       "aware_of_memory"),
 ]
 
-_POST_SURVEY_HEADERS = [
-    "timestamp", "user_id",
-    "memory_awareness", "unexpected_memory", "unexpected_desc",
-    "wrong_memory", "wrong_desc", "want_easy_memory", "want_reason",
-    "edit_delete_intent", "add_intent", "would_use_crud",
-    "useful_feature", "inconvenient", "preferred_display",
-    "preferred_timing", "timing_reason", "wanted_feature",
+_POST_SURVEY_FIELDS = [
+    ("Q1. 대화하면서 정보가 저장된다고 느꼈나요?",                      "memory_awareness"),
+    ("Q2. 저장된 메모리가 예상과 달랐나요? (예/아니오)",               "unexpected_memory"),
+    ("Q2-1. 예상과 달랐던 경우 설명",                                   "unexpected_desc"),
+    ("Q3. 잘못 저장된 정보가 있었나요? (예/아니오)",                   "wrong_memory"),
+    ("Q3-1. 잘못 저장된 경우 설명",                                     "wrong_desc"),
+    ("Q4. 기존 챗봇에서도 메모리를 쉽게 볼 수 있으면 좋겠나요? (예/아니오)", "want_easy_memory"),
+    ("Q4-1. 이유",                                                      "want_reason"),
+    ("Q5. 수정/삭제 의도",                                              "edit_delete_intent"),
+    ("Q6. 추가 의도",                                                   "add_intent"),
+    ("Q7. 수정/삭제/추가 기능 실제 사용 의향",                          "would_use_crud"),
+    ("Q8. 유용했던 기능",                                               "useful_feature"),
+    ("Q9. 불편하거나 부족했던 점",                                      "inconvenient"),
+    ("Q10. 선호하는 메모리 표시 방식",                                  "preferred_display"),
+    ("Q11. 메모리 확인 시점",                                           "preferred_timing"),
+    ("Q11-1. 시점 이유",                                                "timing_reason"),
+    ("Q12. 원하는 추가 기능",                                           "wanted_feature"),
 ]
 
 
 def save_pre_survey(user_id: str, data: dict):
-    """사전 설문 결과를 pre_survey 탭에 저장."""
+    """사전 설문 결과를 pre_survey 탭에 저장 (질문 텍스트를 헤더로 사용)."""
     try:
-        ws = _get_or_create_ws("pre_survey", _PRE_SURVEY_HEADERS)
+        headers = ["timestamp", "user_id"] + [q for q, _ in _PRE_SURVEY_FIELDS]
+        ws = _get_or_create_ws("pre_survey", headers)
         row = [datetime.now().isoformat(), user_id] + [
-            json.dumps(data.get(h, ""), ensure_ascii=False)
-            if isinstance(data.get(h), list)
-            else str(data.get(h, ""))
-            for h in _PRE_SURVEY_HEADERS[2:]
+            json.dumps(data.get(k, ""), ensure_ascii=False)
+            if isinstance(data.get(k), list)
+            else str(data.get(k, ""))
+            for _, k in _PRE_SURVEY_FIELDS
         ]
         ws.append_row(row)
     except Exception:
@@ -117,11 +131,12 @@ def save_pre_survey(user_id: str, data: dict):
 
 
 def save_post_survey(user_id: str, data: dict):
-    """사후 설문 결과를 post_survey 탭에 저장."""
+    """사후 설문 결과를 post_survey 탭에 저장 (질문 텍스트를 헤더로 사용)."""
     try:
-        ws = _get_or_create_ws("post_survey", _POST_SURVEY_HEADERS)
+        headers = ["timestamp", "user_id"] + [q for q, _ in _POST_SURVEY_FIELDS]
+        ws = _get_or_create_ws("post_survey", headers)
         row = [datetime.now().isoformat(), user_id] + [
-            str(data.get(h, "")) for h in _POST_SURVEY_HEADERS[2:]
+            str(data.get(k, "")) for _, k in _POST_SURVEY_FIELDS
         ]
         ws.append_row(row)
     except Exception:
