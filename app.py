@@ -31,6 +31,8 @@ defaults = {
     "message_count":      0,
     "session_started":    False,
     "consent_given":      False,
+    "show_task1_intro":   False,
+    "show_task2_intro":   False,
     "current_task":       "vacation",
     "task2_start_index":  0,
     "conversation_saved": False,
@@ -61,12 +63,53 @@ if not st.session_state.consent_given:
     """)
     if st.button("✅ 동의하고 시작하기", type="primary"):
         st.session_state.consent_given = True
+        st.session_state.show_task1_intro = True
         log_event(uid, "consent_agreed")
         log_event(uid, "task_started", {"task": "vacation"})
         st.rerun()
     st.stop()
 
 # ── 다이얼로그 ───────────────────────────────────────────────────────────────
+@st.dialog("주제 1 안내")
+def task1_intro():
+    st.markdown("""
+**이번 첫 번째 주제는 여름 휴가 계획입니다.**
+
+챗봇과 자유롭게 대화하며 여름 휴가에 대해 이야기해보세요.
+
+- 어디를 가고 싶은지
+- 누구와 함께 가고 싶은지
+- 어떻게 시간을 보내고 싶은지
+
+최대 10분 동안 대화할 수 있으며, 도중 연구자가 다음 task 전환 안내를 진행할 수 있습니다. 
+다음 task로 전환하는 버튼은 반드시 연구자 동의 후 진행 부탁드립니다. 
+그럼 편하게 진행 시작해주세요!
+    """)
+    if st.button("✅ 시작하기", type="primary", key="task1_start"):
+        st.session_state.show_task1_intro = False
+        st.rerun()
+
+
+@st.dialog("주제 2 안내")
+def task2_intro():
+    st.markdown("""
+**이제 두 번째 주제로 넘어갑니다.**
+
+이번에는 요즘 관심 있는 것이나 고민에 대해 이야기해보세요.
+
+- 최근 빠져있는 취미나 관심사
+- 요즘 신경 쓰이거나 고민되는 일
+- 일상에서 즐겁거나 힘든 것들
+
+최대 10분 동안 대화할 수 있으며, 도중 연구자가 다음 task 완료를 부탁할 수 있습니다. 
+완료 버튼은 반드시 연구자 동의 후 진행 부탁드립니다. 
+첫 번째 주제와 마찬가지로 편하게 이야기해 주시면 됩니다!
+    """)
+    if st.button("✅ 시작하기", type="primary", key="task2_start"):
+        st.session_state.show_task2_intro = False
+        st.rerun()
+
+
 @st.dialog("다음 주제로 넘어가기")
 def confirm_next_topic():
     st.write("연구자의 지시 하에 다음 주제 버튼을 누를 수 있습니다. 넘어가시겠습니까?")
@@ -79,6 +122,7 @@ def confirm_next_topic():
             st.session_state.task2_start_index = len(st.session_state.chat_history)
             log_event(uid, "task_started", {"task": "concern", "task1_memories": len(saved)})
             st.session_state.current_task = "concern"
+            st.session_state.show_task2_intro = True
             st.rerun()
     with c2:
         if st.button("아니오", key="next_no"):
@@ -246,6 +290,12 @@ with st.sidebar:
         st.divider()
         if st.button("✅ 대화 완료", type="primary", use_container_width=True):
             confirm_complete()
+
+# 태스크 안내 팝업
+if st.session_state.show_task1_intro:
+    task1_intro()
+if st.session_state.show_task2_intro:
+    task2_intro()
 
 # 메인 채팅
 st.title("🧠 MemoryGlass")
