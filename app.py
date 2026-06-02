@@ -102,6 +102,32 @@ def confirm_complete():
             st.rerun()
 
 
+# ── 사이드바 ─────────────────────────────────────────────────────────────────
+with st.sidebar:
+    st.markdown("## 🧠 MemoryGlass")
+    st.divider()
+
+    if not st.session_state.memory_panel_open:
+        # 현재 태스크 표시
+        if st.session_state.current_task == "vacation":
+            st.markdown("**현재 주제**")
+            st.info("💬 주제 1\n\n여름 휴가 계획")
+            st.caption("어디를 가고 싶은지, 누구와 갈지,\n어떻게 보내고 싶은지 편하게 이야기해보세요.")
+            st.divider()
+            if st.button("📌 다음 주제로 넘어가기", use_container_width=True):
+                confirm_next_topic()
+        else:
+            st.markdown("**현재 주제**")
+            st.info("💬 주제 2\n\n요즘 관심사 / 고민")
+            st.caption("요즘 관심 있는 것이나\n신경 쓰이는 일을 편하게 이야기해보세요.")
+            st.divider()
+            if st.button("✅ 대화 완료", type="primary", use_container_width=True):
+                confirm_complete()
+    else:
+        st.success("✅ 대화 완료")
+        st.caption("오른쪽에서 저장된 기억을\n확인하고 수정해보세요.")
+
+
 # ── 레이아웃: 패널 열림 여부에 따라 컬럼 분할 ────────────────────────────────
 if st.session_state.memory_panel_open:
     chat_col, mem_col = st.columns([1.1, 1])
@@ -114,24 +140,6 @@ else:
 # ══════════════════════════════════════════════════════════════════════════════
 with chat_col:
     st.title("🧠 MemoryGlass")
-
-    # 태스크 안내 + 전환/완료 버튼
-    if not st.session_state.memory_panel_open:
-        if st.session_state.current_task == "vacation":
-            st.info("""
-💬 **주제 1: 여름 휴가 계획**
-이번 여름 휴가 계획에 대해 챗봇과 자유롭게 이야기해보세요.
-어디를 가고 싶은지, 누구와 갈지, 어떻게 보내고 싶은지 편하게 말씀해주세요.
-            """)
-            if st.button("📌 다음 주제로 넘어가기"):
-                confirm_next_topic()
-        else:
-            st.info("""
-💬 **주제 2: 요즘 관심사 / 고민**
-요즘 관심 있는 것이나 신경 쓰이는 일을 챗봇과 편하게 이야기해보세요.
-            """)
-            if st.button("✅ 대화 완료"):
-                confirm_complete()
 
     st.divider()
 
