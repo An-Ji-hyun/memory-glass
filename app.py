@@ -49,8 +49,8 @@ if not st.session_state.session_started:
 # ── Phase 0: 동의서 ──────────────────────────────────────────────────────────
 if not st.session_state.consent_given:
     st.title("🧠 MemoryGlass 연구 참여 동의")
-    st.markdown("""
-본 연구에 참여해 주셔서 감사합니다.
+    st.markdown(f"""
+**{uid}님 안녕하세요. 본 연구에 참여해 주셔서 감사합니다.**
 
 **연구 목적:** AI 챗봇 인터페이스 설계 연구
 
@@ -74,7 +74,8 @@ def confirm_next_topic():
     with c1:
         if st.button("예, 넘어갈게요", type="primary", key="next_yes"):
             with st.spinner("대화 내용을 저장하는 중..."):
-                saved = save_conversation(uid, st.session_state.chat_history)
+                task1_user_msgs = [m for m in st.session_state.chat_history if m["role"] == "user"]
+                saved = save_conversation(uid, task1_user_msgs)
             st.session_state.task2_start_index = len(st.session_state.chat_history)
             log_event(uid, "task_started", {"task": "concern", "task1_memories": len(saved)})
             st.session_state.current_task = "concern"
@@ -91,8 +92,11 @@ def confirm_complete():
     with c1:
         if st.button("예, 완료할게요", type="primary", key="done_yes"):
             with st.spinner("대화 내용을 저장하고 분석하는 중..."):
-                task2_msgs = st.session_state.chat_history[st.session_state.task2_start_index:]
-                save_conversation(uid, task2_msgs)
+                task2_user_msgs = [
+                    m for m in st.session_state.chat_history[st.session_state.task2_start_index:]
+                    if m["role"] == "user"
+                ]
+                save_conversation(uid, task2_user_msgs)
                 all_mems = get_all_memories(uid)
                 clusters = cluster_memories_with_sources(all_mems, st.session_state.chat_history)
             st.session_state.conversation_saved = True
