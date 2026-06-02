@@ -265,50 +265,65 @@ if st.session_state.screen == "memory_view":
             other_topics = [(j, c["label"]) for j, c in enumerate(clusters) if j != sel]
 
             for item_idx, item in enumerate(cluster["items"]):
+                ikey = f"{sel}_{item_idx}"  # unique key per item position
+                edit_flag = f"editing_{ikey}"
+                if edit_flag not in st.session_state:
+                    st.session_state[edit_flag] = False
+
                 with st.container():
                     st.markdown(f"**{item['text']}**")
 
+                    # 원본 발화
                     if item.get("source"):
                         with st.expander("🔍 원본 발화 확인하기"):
                             st.markdown(f"> {item['source']}")
 
-                    c1, c2, c3 = st.columns([2, 2, 1])
-
-                    with c1:
-                        with st.expander("✏️ 수정하기"):
-                            new_text = st.text_area("", value=item["text"],
-                                                     key=f"edit_{item['id']}_{item_idx}", height=70)
-                            s1, s2 = st.columns(2)
-                            with s1:
-                                if st.button("저장", key=f"save_{item['id']}_{item_idx}"):
-                                    if update_memory(item["id"], new_text):
-                                        clusters[sel]["items"][item_idx]["text"] = new_text
-                                        log_event(uid, "memory_edited",
-                                                  {"old": item["text"], "new": new_text})
-                                        sync_to_sheets()
-                                        st.rerun()
-                            with s2:
-                                if st.button("취소", key=f"cancel_{item['id']}_{item_idx}"):
-                                    st.rerun()
-
-                    with c2:
-                        if other_topics:
-                            with st.expander("🏷️ 토픽 변경"):
-                                for j, tlabel in other_topics:
-                                    if st.button(tlabel, key=f"move_{item['id']}_{item_idx}_{j}"):
-                                        moved = clusters[sel]["items"].pop(item_idx)
-                                        clusters[j]["items"].append(moved)
-                                        log_event(uid, "memory_moved",
-                                                  {"memory": item["text"], "to": tlabel})
-                                        st.rerun()
-
-                    with c3:
-                        if st.button("🗑️", key=f"del_{item['id']}_{item_idx}"):
-                            if item["id"] and delete_memory(item["id"]):
-                                log_event(uid, "memory_deleted", {"memory": item["text"]})
-                                sync_to_sheets()
-                            clusters[sel]["items"].pop(item_idx)
-                            st.rerun()
+                    # 수정 폼 (토글 방식)
+                    if st.session_state[edit_flag]:
+                        new_text = st.text_area("수정 내용", value=item["text"],
+                                                key=f"ta_{ikey}", height=70)
+                        s1, s2 = st.columns(2)
+                        with s1:
+                            if st.button("저장", key=f"save_{ikey}", type="primary"):
+                                old_text = item["text"]
+                                if update_memory(item["id"], new_text):
+                                    clusters[sel]["items"][item_idx]["text"] = new_text
+                                    log_event(uid, "memory_edited",
+                                              {"old": old_text, "new": new_text})
+                                    sync_to_sheets()
+                                st.session_state[edit_flag] = False
+                                st.toast("저장되었습니다.", icon="✅")
+                                st.rerun()
+                        with s2:
+                            if st.button("취소", key=f"cancel_{ikey}"):
+                                st.session_state[edit_flag] = False
+                                st.rerun()
+                    else:
+                        c1, c2, c3 = st.columns([2, 2, 1])
+                        with c1:
+                            if st.button("✏️ 수정하기", key=f"editbtn_{ikey}"):
+                                st.session_state[edit_flag] = True
+                                st.rerun()
+                        with c2:
+                            if other_topics:
+                                with st.expander("🏷️ 토픽 변경"):
+                                    for j, tlabel in other_topics:
+                                        if st.button(tlabel, key=f"move_{ikey}_{j}"):
+                                            moved = clusters[sel]["items"].pop(item_idx)
+                                            clusters[j]["items"].append(moved)
+                                            log_event(uid, "memory_moved",
+                                                      {"memory": item["text"], "to": tlabel})
+                                            st.toast(f"'{tlabel}' 토픽으로 이동했어요.", icon="🏷️")
+                                            st.rerun()
+                        with c3:
+                            if st.button("🗑️", key=f"del_{ikey}"):
+                                if item["id"]:
+                                    delete_memory(item["id"])
+                                    log_event(uid, "memory_deleted", {"memory": item["text"]})
+                                    sync_to_sheets()
+                                clusters[sel]["items"].pop(item_idx)
+                                st.toast("삭제되었습니다.", icon="🗑️")
+                                st.rerun()
 
                     st.divider()
 
