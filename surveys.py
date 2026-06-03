@@ -198,9 +198,9 @@ def render_post_survey(event_log: list) -> dict | None:
     q10 = st.text_area("", key="post_q10", placeholder="예: 목록, 시각화, 타임라인 등 — 10자 이상 작성해주세요.",
                        label_visibility="collapsed")
 
-    st.markdown("**11. 어느 시점에 메모리를 확인하고 싶으세요? 그 이유도 함께 설명해주세요. 또는 다른 방법을 원한다면 서술해주세요.**")
-    q11_timing = st.radio("", ["대화 도중 계속해서 실시간 공개", "내가 원할 때 언제든지", "어느정도 대화를 진행하면 저장 내역 공개 알림", "기타"],
-                          index=None, key="post_q11_timing", label_visibility="collapsed")
+    st.markdown("**11. 어느 시점에 메모리를 확인하고 싶으세요? (복수 선택 가능) 그 이유도 함께 설명해주세요.**")
+    q11_timing = st.multiselect("", ["대화 도중 계속해서 실시간 공개", "내가 원할 때 언제든지", "어느정도 대화를 진행하면 저장 내역 공개 알림", "기타"],
+                                key="post_q11_timing", label_visibility="collapsed")
     q11_reason = st.text_area("", key="post_q11_reason", placeholder="이유를 10자 이상 작성해주세요.",
                               label_visibility="collapsed")
 
@@ -229,7 +229,7 @@ def render_post_survey(event_log: list) -> dict | None:
         _validate_text(q9, "Q9", errors)
         _validate_text(q10, "Q10", errors)
         if not q11_timing:
-            errors.append("Q11: 시점을 선택해주세요.")
+            errors.append("Q11: 시점을 하나 이상 선택해주세요.")
         _validate_text(q11_reason, "Q11 이유", errors)
         _validate_text(q12, "Q12", errors)
 
