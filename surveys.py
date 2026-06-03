@@ -147,33 +147,33 @@ def render_post_survey(event_log: list) -> dict | None:
 
     # 수정/삭제 의도 (동적)
     if edited_events or deleted_events:
-        parts = []
+        st.markdown("**5. 메모리를 수정하거나 삭제하신 항목이 있습니다. 각 항목을 그렇게 하신 이유가 무엇인지 설명해주세요.**")
         if edited_events:
-            items = [f"'{e.get('old','')}'→'{e.get('new','')}'" for e in edited_events[:3]]
-            parts.append(f"수정: {', '.join(items)}")
+            st.markdown("✏️ **수정하신 항목:**")
+            for e in edited_events[:5]:
+                st.markdown(f"- 기존: *{e.get('old','')}* → 변경: *{e.get('new','')}*")
         if deleted_events:
-            items = [f"'{e.get('memory','')}'" for e in deleted_events[:3]]
-            parts.append(f"삭제: {', '.join(items)}")
-        q5_label = f"**5. {' / '.join(parts)} — 각각 그 의도가 무엇이었는지 설명해주세요.**"
+            st.markdown("🗑️ **삭제하신 항목:**")
+            for e in deleted_events[:5]:
+                st.markdown(f"- *{e.get('memory','')}*")
     else:
-        q5_label = "**5. 수정하거나 삭제하고 싶었던 메모리가 있었나요? 있었다면 어떤 이유였을지 설명해주세요.**"
-    st.markdown(q5_label)
+        st.markdown("**5. 메모리를 수정하거나 삭제하고 싶었던 항목이 있었나요? 있었다면 어떤 이유에서였는지 설명해주세요.**")
     q5 = st.text_area("", key="post_q5", placeholder="10자 이상 작성해주세요.",
                       label_visibility="collapsed")
 
     # 추가 의도 (동적)
     if topic_events or added_events:
-        parts = []
+        st.markdown("**6. 새로 추가하신 항목이 있습니다. 각 항목을 추가하신 이유가 무엇인지 설명해주세요.**")
         if topic_events:
-            items = [f"'{e.get('label','')}'" for e in topic_events[:3]]
-            parts.append(f"토픽 추가: {', '.join(items)}")
+            st.markdown("🏷️ **추가하신 토픽:**")
+            for e in topic_events[:5]:
+                st.markdown(f"- *{e.get('label','')}*")
         if added_events:
-            items = [f"'{e.get('memory','')}'" for e in added_events[:3]]
-            parts.append(f"메모리 추가: {', '.join(items)}")
-        q6_label = f"**6. {' / '.join(parts)} — 왜 추가하셨나요?**"
+            st.markdown("➕ **추가하신 메모리:**")
+            for e in added_events[:5]:
+                st.markdown(f"- *{e.get('memory','')}*")
     else:
-        q6_label = "**6. 직접 추가하고 싶었던 기억이 있었나요? 있었다면 어떤 내용을 추가했을지 설명해주세요.**"
-    st.markdown(q6_label)
+        st.markdown("**6. 챗봇이 기억해줬으면 했는데 저장되지 않은 정보가 있었나요? 있었다면 어떤 내용이었는지, 그리고 왜 기억해주길 바랐는지 설명해주세요.**")
     q6 = st.text_area("", key="post_q6", placeholder="10자 이상 작성해주세요.",
                       label_visibility="collapsed")
 
@@ -198,13 +198,13 @@ def render_post_survey(event_log: list) -> dict | None:
     q10 = st.text_area("", key="post_q10", placeholder="예: 목록, 시각화, 타임라인 등 — 10자 이상 작성해주세요.",
                        label_visibility="collapsed")
 
-    st.markdown("**11. 어느 시점에 메모리를 확인하고 싶으세요? 그 이유도 함께 설명해주세요.**")
-    q11_timing = st.radio("", ["대화 중", "대화가 끝난 이후", "원할 때 언제든지"],
+    st.markdown("**11. 어느 시점에 메모리를 확인하고 싶으세요? 그 이유도 함께 설명해주세요. 또는 다른 방법을 원한다면 서술해주세요.**")
+    q11_timing = st.radio("", ["대화 도중 계속해서 실시간 공개", "내가 원할 때 언제든지", "어느정도 대화를 진행하면 저장 내역 공개 알림", "기타"],
                           index=None, key="post_q11_timing", label_visibility="collapsed")
     q11_reason = st.text_area("", key="post_q11_reason", placeholder="이유를 10자 이상 작성해주세요.",
                               label_visibility="collapsed")
 
-    st.markdown("**12. 지금 없는 기능 중 원하는 게 있나요? 그 이유도 설명해주세요.**")
+    st.markdown("**12. 현재 시스템에 없는 메모리 기능 중 원하는 게 있나요? 그 이유도 설명해주세요.**")
     q12 = st.text_area("", key="post_q12", placeholder="10자 이상 작성해주세요.",
                        label_visibility="collapsed")
 
